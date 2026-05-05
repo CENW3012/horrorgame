@@ -25,14 +25,15 @@ jobs:
           sudo apt-get install -y cmake ninja-build pkg-config \
             libavcodec-dev libavformat-dev libavutil-dev \
             libswscale-dev libswresample-dev \
-            libpng-dev libjpeg-dev
+            libpng-dev libjpeg-dev \
+            libx11-dev libxext-dev libxrandr-dev libxi-dev libxss-dev libxkbcommon-dev
 
       - name: Cache SDL3 & SDL3_image
         id: cache-sdl3
         uses: actions/cache@v4
         with:
           path: .sdl3
-          key: sdl3-linux-3.2.0
+          key: sdl3-linux-3.2.0-x11
 
       - name: Build SDL3
         if: steps.cache-sdl3.outputs.cache-hit != 'true'
@@ -107,13 +108,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Export GitHub Actions cache variables for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Install SDL3 with vcpkg
+        env:
+          VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
         run: |
           git clone https://github.com/Microsoft/vcpkg.git
           cd vcpkg
           .\bootstrap-vcpkg.bat
           .\vcpkg integrate install
-          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows
+          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows ffmpeg:x64-windows
 
       - name: Create build directory
         run: mkdir build
@@ -164,7 +174,7 @@ jobs:
 
       - name: Install SDL3 (macOS)
         run: |
-          brew install sdl3 sdl3_image cmake
+          brew install sdl3 sdl3_image cmake ffmpeg
 
       - name: Create build directory
         run: mkdir build
