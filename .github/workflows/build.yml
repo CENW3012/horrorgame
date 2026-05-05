@@ -136,7 +136,7 @@ jobs:
           mkdir -p horrorgame-windows
           cp build/Release/horrorgame.exe horrorgame-windows/ || cp build/horrorgame.exe horrorgame-windows/
           cp -r assets horrorgame-windows/ || echo "Assets not found, continuing..."
-          cp -r maps   horrorgame-windows/ || echo "Maps not found, continuing..."
+          cp -r maps horrorgame-windows/ || echo "Maps not found, continuing..."
           
           # Copy all DLLs installed by vcpkg (SDL3, SDL3_image, FFmpeg, and their deps)
           find vcpkg/installed/x64-windows/bin -name "*.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
