@@ -107,13 +107,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install SDL3 with vcpkg
+      - name: Install SDL3 and FFmpeg with vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git
           cd vcpkg
           .\bootstrap-vcpkg.bat
           .\vcpkg integrate install
-          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows
+          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows ffmpeg:x64-windows
 
       - name: Create build directory
         run: mkdir build
@@ -136,10 +136,10 @@ jobs:
           mkdir -p horrorgame-windows
           cp build/Release/horrorgame.exe horrorgame-windows/ || cp build/horrorgame.exe horrorgame-windows/
           cp -r assets horrorgame-windows/ || echo "Assets not found, continuing..."
+          cp -r maps   horrorgame-windows/ || echo "Maps not found, continuing..."
           
-          # Try to find and copy SDL3 DLLs
-          find vcpkg/installed -name "SDL3.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
-          find vcpkg/installed -name "SDL3_image.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
+          # Copy all DLLs installed by vcpkg (SDL3, SDL3_image, FFmpeg, and their deps)
+          find vcpkg/installed/x64-windows/bin -name "*.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
           
           # List what we copied
           ls -la horrorgame-windows/
