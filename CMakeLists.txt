@@ -68,15 +68,31 @@ target_link_libraries(horrorgame ${SDL3_LINK_TARGET})
 # FFmpeg libraries for video/audio decoding (jumpscare.mov playback).
 # On macOS install with: brew install ffmpeg
 # On Linux install with: sudo apt install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
-find_package(PkgConfig REQUIRED)
-# Add Homebrew FFmpeg pkg-config paths for macOS (Intel + Apple Silicon)
-set(ENV{PKG_CONFIG_PATH}
-    "/usr/local/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/ffmpeg/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
-pkg_check_modules(FFMPEG REQUIRED
-    libavformat libavcodec libavutil libswscale libswresample)
-target_include_directories(horrorgame PRIVATE ${FFMPEG_INCLUDE_DIRS})
-target_link_directories(horrorgame PRIVATE ${FFMPEG_LIBRARY_DIRS})
-target_link_libraries(horrorgame ${FFMPEG_LIBRARIES})
+# On Windows use vcpkg: vcpkg install ffmpeg:x64-windows
+find_package(PkgConfig)
+if(PkgConfig_FOUND)
+    # Add Homebrew FFmpeg pkg-config paths for macOS (Intel + Apple Silicon)
+    set(ENV{PKG_CONFIG_PATH}
+        "/usr/local/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/ffmpeg/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+    pkg_check_modules(FFMPEG REQUIRED
+        libavformat libavcodec libavutil libswscale libswresample)
+    target_include_directories(horrorgame PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_link_directories(horrorgame PRIVATE ${FFMPEG_LIBRARY_DIRS})
+    target_link_libraries(horrorgame ${FFMPEG_LIBRARIES})
+else()
+    # Fallback for Windows / MSVC builds without pkg-config (e.g. vcpkg).
+    # vcpkg exposes FFmpeg headers and import libraries via its toolchain.
+    find_path(AVFORMAT_INCLUDE_DIR libavformat/avformat.h REQUIRED)
+    find_library(AVFORMAT_LIB   avformat   REQUIRED)
+    find_library(AVCODEC_LIB    avcodec    REQUIRED)
+    find_library(AVUTIL_LIB     avutil     REQUIRED)
+    find_library(SWSCALE_LIB    swscale    REQUIRED)
+    find_library(SWRESAMPLE_LIB swresample REQUIRED)
+    target_include_directories(horrorgame PRIVATE ${AVFORMAT_INCLUDE_DIR})
+    target_link_libraries(horrorgame
+        ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB}
+        ${SWSCALE_LIB}  ${SWRESAMPLE_LIB})
+endif()
 
 # If SDL3_image was found, enable PNG loading for the dialogue background
 if(SDL3_IMAGE_LINK_TARGET)
