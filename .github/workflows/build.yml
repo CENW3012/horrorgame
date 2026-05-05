@@ -9,6 +9,97 @@ on:
       - main
 
 jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    env:
+      SDL3_PREFIX: ${{ github.workspace }}/.sdl3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build pkg-config \
+            libavcodec-dev libavformat-dev libavutil-dev \
+            libswscale-dev libswresample-dev \
+            libpng-dev libjpeg-dev
+
+      - name: Cache SDL3 & SDL3_image
+        id: cache-sdl3
+        uses: actions/cache@v4
+        with:
+          path: .sdl3
+          key: sdl3-linux-3.2.0
+
+      - name: Build SDL3
+        if: steps.cache-sdl3.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL \
+            https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.2.0.tar.gz \
+            | tar -xz -C /tmp
+          cmake -S /tmp/SDL-release-3.2.0 -B /tmp/sdl3-build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=$SDL3_PREFIX
+          cmake --build /tmp/sdl3-build
+          cmake --install /tmp/sdl3-build
+
+      - name: Build SDL3_image
+        if: steps.cache-sdl3.outputs.cache-hit != 'true'
+        run: |
+          curl -fsSL \
+            https://github.com/libsdl-org/SDL_image/archive/refs/tags/release-3.0.0.tar.gz \
+            | tar -xz -C /tmp
+          cmake -S /tmp/SDL_image-release-3.0.0 -B /tmp/sdl3image-build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=$SDL3_PREFIX \
+            -DSDL3_DIR=$SDL3_PREFIX/lib/cmake/SDL3
+          cmake --build /tmp/sdl3image-build
+          cmake --install /tmp/sdl3image-build
+
+      - name: Configure with CMake
+        run: |
+          cmake -S . -B build \
+            -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH=$SDL3_PREFIX
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Run game headlessly
+        run: |
+          cd build
+          export LD_LIBRARY_PATH=$SDL3_PREFIX/lib:$LD_LIBRARY_PATH
+          SDL_VIDEODRIVER=offscreen SDL_AUDIODRIVER=dummy timeout 5 ./horrorgame
+          rc=$?
+          if [ $rc -ne 0 ] && [ $rc -ne 124 ]; then
+            echo "Game crashed with exit code $rc"
+            exit 1
+          fi
+          echo "Game ran successfully (exit code: $rc)"
+
+      - name: Package Linux artifact
+        run: |
+          mkdir -p horrorgame-linux
+          cp build/horrorgame horrorgame-linux/
+          cp -r build/assets horrorgame-linux/
+          cp -r build/maps   horrorgame-linux/
+          # Bundle SDL3 shared libraries so the binary runs without a local build
+          cp $SDL3_PREFIX/lib/libSDL3.so*       horrorgame-linux/ 2>/dev/null || true
+          cp $SDL3_PREFIX/lib/libSDL3_image.so* horrorgame-linux/ 2>/dev/null || true
+          zip -r horrorgame-linux.zip horrorgame-linux/
+
+      - name: Upload Linux artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: horrorgame-linux
+          path: horrorgame-linux.zip
+
   build-windows:
     runs-on: windows-latest
     
@@ -133,7 +224,7 @@ jobs:
           path: horrorgame-macos.zip
 
   create-release:
-    needs: [build-windows, build-macos]
+    needs: [build-linux, build-windows, build-macos]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     
@@ -145,6 +236,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            horrorgame-linux.zip
             horrorgame-windows/horrorgame-windows.zip
             horrorgame-macos/horrorgame-macos.zip
           draft: false
