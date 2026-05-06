@@ -25,14 +25,16 @@ jobs:
           sudo apt-get install -y cmake ninja-build pkg-config \
             libavcodec-dev libavformat-dev libavutil-dev \
             libswscale-dev libswresample-dev \
-            libpng-dev libjpeg-dev
+            libpng-dev libjpeg-dev \
+            libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
+            libxi-dev libxext-dev
 
       - name: Cache SDL3 & SDL3_image
         id: cache-sdl3
         uses: actions/cache@v4
         with:
           path: .sdl3
-          key: sdl3-linux-3.2.0
+          key: sdl3-linux-3.2.0-x11
 
       - name: Build SDL3
         if: steps.cache-sdl3.outputs.cache-hit != 'true'
@@ -107,13 +109,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install SDL3 with vcpkg
+      - name: Install dependencies with vcpkg
         run: |
           git clone https://github.com/Microsoft/vcpkg.git
           cd vcpkg
           .\bootstrap-vcpkg.bat
           .\vcpkg integrate install
-          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows
+          .\vcpkg install sdl3:x64-windows sdl3-image:x64-windows ffmpeg:x64-windows
 
       - name: Create build directory
         run: mkdir build
@@ -136,10 +138,10 @@ jobs:
           mkdir -p horrorgame-windows
           cp build/Release/horrorgame.exe horrorgame-windows/ || cp build/horrorgame.exe horrorgame-windows/
           cp -r assets horrorgame-windows/ || echo "Assets not found, continuing..."
+          cp -r maps   horrorgame-windows/ || echo "Maps not found, continuing..."
           
-          # Try to find and copy SDL3 DLLs
-          find vcpkg/installed -name "SDL3.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
-          find vcpkg/installed -name "SDL3_image.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
+          # Copy all runtime DLLs installed by vcpkg (SDL3, SDL3_image, FFmpeg, and their deps)
+          find vcpkg/installed/x64-windows/bin -name "*.dll" -exec cp {} horrorgame-windows/ \; 2>/dev/null || true
           
           # List what we copied
           ls -la horrorgame-windows/
@@ -162,9 +164,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install SDL3 (macOS)
+      - name: Install SDL3 and FFmpeg (macOS)
         run: |
-          brew install sdl3 sdl3_image cmake
+          brew install sdl3 sdl3_image ffmpeg pkg-config cmake
 
       - name: Create build directory
         run: mkdir build
@@ -188,8 +190,9 @@ jobs:
           cp build/horrorgame horrorgame.app/Contents/MacOS/ || exit 1
           chmod +x horrorgame.app/Contents/MacOS/horrorgame
           
-          # Copy assets
+          # Copy assets and maps
           cp -r assets horrorgame.app/Contents/MacOS/ || echo "Assets folder not found"
+          cp -r maps   horrorgame.app/Contents/MacOS/ || echo "Maps folder not found"
           
           # Create Info.plist
           cat > horrorgame.app/Contents/Info.plist << 'EOF'

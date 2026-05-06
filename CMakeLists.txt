@@ -68,15 +68,36 @@ target_link_libraries(horrorgame ${SDL3_LINK_TARGET})
 # FFmpeg libraries for video/audio decoding (jumpscare.mov playback).
 # On macOS install with: brew install ffmpeg
 # On Linux install with: sudo apt install libavcodec-dev libavformat-dev libavutil-dev libswscale-dev libswresample-dev
-find_package(PkgConfig REQUIRED)
-# Add Homebrew FFmpeg pkg-config paths for macOS (Intel + Apple Silicon)
-set(ENV{PKG_CONFIG_PATH}
-    "/usr/local/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/ffmpeg/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
-pkg_check_modules(FFMPEG REQUIRED
-    libavformat libavcodec libavutil libswscale libswresample)
-target_include_directories(horrorgame PRIVATE ${FFMPEG_INCLUDE_DIRS})
-target_link_directories(horrorgame PRIVATE ${FFMPEG_LIBRARY_DIRS})
-target_link_libraries(horrorgame ${FFMPEG_LIBRARIES})
+# On Windows install with: vcpkg install ffmpeg:x64-windows
+if(WIN32)
+    # On Windows, pkg-config is typically unavailable.
+    # vcpkg sets CMAKE_PREFIX_PATH so find_path / find_library locate the headers and libs.
+    find_path(FFMPEG_INCLUDE_DIR libavformat/avformat.h
+        PATH_SUFFIXES include)
+    find_library(AVFORMAT_LIB  avformat)
+    find_library(AVCODEC_LIB   avcodec)
+    find_library(AVUTIL_LIB    avutil)
+    find_library(SWSCALE_LIB   swscale)
+    find_library(SWRESAMPLE_LIB swresample)
+    if(NOT FFMPEG_INCLUDE_DIR OR NOT AVFORMAT_LIB)
+        message(FATAL_ERROR
+            "FFmpeg not found. On Windows install via: vcpkg install ffmpeg:x64-windows")
+    endif()
+    target_include_directories(horrorgame PRIVATE ${FFMPEG_INCLUDE_DIR})
+    target_link_libraries(horrorgame
+        ${AVFORMAT_LIB} ${AVCODEC_LIB} ${AVUTIL_LIB}
+        ${SWSCALE_LIB} ${SWRESAMPLE_LIB})
+else()
+    find_package(PkgConfig REQUIRED)
+    # Add Homebrew FFmpeg pkg-config paths for macOS (Intel + Apple Silicon)
+    set(ENV{PKG_CONFIG_PATH}
+        "/usr/local/opt/ffmpeg/lib/pkgconfig:/opt/homebrew/opt/ffmpeg/lib/pkgconfig:$ENV{PKG_CONFIG_PATH}")
+    pkg_check_modules(FFMPEG REQUIRED
+        libavformat libavcodec libavutil libswscale libswresample)
+    target_include_directories(horrorgame PRIVATE ${FFMPEG_INCLUDE_DIRS})
+    target_link_directories(horrorgame PRIVATE ${FFMPEG_LIBRARY_DIRS})
+    target_link_libraries(horrorgame ${FFMPEG_LIBRARIES})
+endif()
 
 # If SDL3_image was found, enable PNG loading for the dialogue background
 if(SDL3_IMAGE_LINK_TARGET)
